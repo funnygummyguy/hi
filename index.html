@@ -95,24 +95,31 @@
         camera.lookAt(player.position);
 
         let spaghettiPieces = [];
-        let spaghettiMaterial = new THREE.LineBasicMaterial({ color: 0xffcc66, linewidth: 5 });
+        let spaghettiMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc66 });
+
         function createSpaghetti() {
-            let points = [];
             let x = (Math.random()-0.5)*8;
             let z = (Math.random()-0.5)*8;
-            for(let i=0;i<5;i++) points.push(new THREE.Vector3(x,0.05*i, z + Math.sin(i*2)*0.1)); // increased wiggle
-            let geometry = new THREE.BufferGeometry().setFromPoints(points);
-            let line = new THREE.Line(geometry, spaghettiMaterial);
-            line.userData.offset = Math.random()*Math.PI*2;
-            line.scale.set(2,2,2); // make it bigger
-            scene.add(line);
-            spaghettiPieces.push(line);
+            let curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(x, 0, z),
+                new THREE.Vector3(x+0.1, 0.2, z+0.1),
+                new THREE.Vector3(x-0.1, 0.4, z-0.1),
+                new THREE.Vector3(x+0.05, 0.6, z+0.05),
+                new THREE.Vector3(x, 0.8, z)
+            ]);
+            let geometry = new THREE.TubeGeometry(curve, 20, 0.1, 8, false);
+            let mesh = new THREE.Mesh(geometry, spaghettiMaterial);
+            mesh.userData.offset = Math.random()*Math.PI*2;
+            scene.add(mesh);
+            spaghettiPieces.push(mesh);
         }
+
         for(let i=0;i<10;i++) createSpaghetti();
 
         let eatSound = new Audio('https://www.soundjay.com/human/sounds/bite-apple-1.mp3');
         let score = 0;
         let move = {left:false,right:false,forward:false,backward:false};
+
         document.addEventListener('keydown',(e)=>{
             if(e.key==='ArrowLeft') move.left=true;
             if(e.key==='ArrowRight') move.right=true;
@@ -127,6 +134,7 @@
         });
 
         let walkAngle = 0;
+
         function animate(){
             requestAnimationFrame(animate);
             let walking=false;
@@ -149,22 +157,20 @@
                 leftLeg.lower.rotation.x = rightLeg.lower.rotation.x = 0;
             }
 
-            spaghettiPieces.forEach((line,i)=>{
-                let positions = line.geometry.attributes.position.array;
-                for(let j=0;j<positions.length;j+=3){
-                    positions[j+2]+=Math.sin(Date.now()*0.002+j+i+line.userData.offset)*0.002;
-                }
-                line.geometry.attributes.position.needsUpdate=true;
+            // Animate spaghetti (slight wiggle)
+            spaghettiPieces.forEach((mesh,i)=>{
+                mesh.rotation.z = Math.sin(Date.now()*0.002 + i)*0.2;
             });
 
+            // Check collision using bounding boxes
+            let playerBox = new THREE.Box3().setFromObject(player);
             for(let i=spaghettiPieces.length-1;i>=0;i--){
-                let line=spaghettiPieces[i];
-                let headPos=new THREE.Vector3();
-                player.children[1].getWorldPosition(headPos);
-                if(headPos.distanceTo(line.position)<1){ // increased collision distance
-                    scene.remove(line);
+                let mesh = spaghettiPieces[i];
+                let spaghettiBox = new THREE.Box3().setFromObject(mesh);
+                if(playerBox.intersectsBox(spaghettiBox)){
+                    scene.remove(mesh);
                     spaghettiPieces.splice(i,1);
-                    score+=1;
+                    score += 1;
                     document.getElementById('score').innerText='Score: '+score;
                     createSpaghetti();
                     eatSound.currentTime=0;
