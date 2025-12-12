@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaghetti Eating Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f0e4d7; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #score { position: absolute; top: 10px; left: 10px; font-size: 24px; color: #333; }
+        #shopBtn { position: absolute; top: 50px; left: 10px; padding: 10px 20px; background-color: #ffcc66; border: none; font-size: 18px; cursor: pointer; }
+        #shop { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(200,200,200,0.9); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .shopItem { margin: 10px; padding: 20px; background: white; border: 2px solid #333; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <button id="shopBtn">Shop</button>
+    <div id="shop">
+        <h2>Shop</h2>
+        <div class="shopItem" id="newCharacter">Buy New Character (10 points)</div>
+        <button id="backBtn">Back</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
+
+        let scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0e4d7);
+
+        let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        let renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        let ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        let directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+
+        let planeGeometry = new THREE.PlaneGeometry(20, 20);
+        let planeMaterial = new THREE.MeshStandardMaterial({ color: 0x88cc88 });
+        let plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2;
+        scene.add(plane);
+
+        let player = new THREE.Group();
+        let leftLeg, rightLeg;
+
+        function createDefaultCharacter() {
+            player.clear();
+            let body = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1,16), new THREE.MeshStandardMaterial({color:0x4444ff}));
+            body.position.y = 1.0;
+            player.add(body);
+
+            let head = new THREE.Mesh(new THREE.SphereGeometry(0.25,16,16), new THREE.MeshStandardMaterial({color:0xffccaa}));
+            head.position.y = 1.7;
+            let leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshStandardMaterial({color:0x000000}));
+            leftEye.position.set(-0.08,0.05,0.22);
+            let rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshStandardMaterial({color:0x000000}));
+            rightEye.position.set(0.08,0.05,0.22);
+            let mouth = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.03,0.02), new THREE.MeshStandardMaterial({color:0xff0000}));
+            mouth.position.set(0,-0.08,0.22);
+            head.add(leftEye,rightEye,mouth);
+            player.add(head);
+
+            function createLeg(xOffset){
+                let upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.5,8), new THREE.MeshStandardMaterial({color:0x3333aa}));
+                let lowerLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.5,8), new THREE.MeshStandardMaterial({color:0x3333aa}));
+                upperLeg.position.set(xOffset,0.75,0);
+                lowerLeg.position.y=-0.5;
+                upperLeg.add(lowerLeg);
+                player.add(upperLeg);
+                return {upper:upperLeg,lower:lowerLeg};
+            }
+            leftLeg = createLeg(-0.15);
+            rightLeg = createLeg(0.15);
+
+            let leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.5,8), new THREE.MeshStandardMaterial({color:0x4444ff}));
+            let rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.5,8), new THREE.MeshStandardMaterial({color:0x4444ff}));
+            leftArm.position.set(-0.35,1.2,0);
+            rightArm.position.set(0.35,1.2,0);
+            player.add(leftArm,rightArm);
+
+            let fork = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.6,0.1), new THREE.MeshStandardMaterial({color:0xaaaaaa}));
+            fork.position.set(0,-0.25,0);
+            rightArm.add(fork);
+        }
+
+        createDefaultCharacter();
+        scene.add(player);
+
+        camera.position.set(0,5,10);
+        camera.lookAt(player.position);
+
+        let spaghettiPieces = [];
+        let spaghettiMaterial = new THREE.LineBasicMaterial({ color: 0xffcc66, linewidth: 5 });
+        function createSpaghetti() {
+            let points = [];
+            let x = (Math.random()-0.5)*8;
+            let z = (Math.random()-0.5)*8;
+            for(let i=0;i<5;i++) points.push(new THREE.Vector3(x,0.05*i, z + Math.sin(i*2)*0.1)); // increased wiggle
+            let geometry = new THREE.BufferGeometry().setFromPoints(points);
+            let line = new THREE.Line(geometry, spaghettiMaterial);
+            line.userData.offset = Math.random()*Math.PI*2;
+            line.scale.set(2,2,2); // make it bigger
+            scene.add(line);
+            spaghettiPieces.push(line);
+        }
+        for(let i=0;i<10;i++) createSpaghetti();
+
+        let eatSound = new Audio('https://www.soundjay.com/human/sounds/bite-apple-1.mp3');
+        let score = 0;
+        let move = {left:false,right:false,forward:false,backward:false};
+        document.addEventListener('keydown',(e)=>{
+            if(e.key==='ArrowLeft') move.left=true;
+            if(e.key==='ArrowRight') move.right=true;
+            if(e.key==='ArrowUp') move.forward=true;
+            if(e.key==='ArrowDown') move.backward=true;
+        });
+        document.addEventListener('keyup',(e)=>{
+            if(e.key==='ArrowLeft') move.left=false;
+            if(e.key==='ArrowRight') move.right=false;
+            if(e.key==='ArrowUp') move.forward=false;
+            if(e.key==='ArrowDown') move.backward=false;
+        });
+
+        let walkAngle = 0;
+        function animate(){
+            requestAnimationFrame(animate);
+            let walking=false;
+            let dir = new THREE.Vector3();
+            if(move.left){player.position.x-=0.1;dir.x-=1;walking=true;}
+            if(move.right){player.position.x+=0.1;dir.x+=1;walking=true;}
+            if(move.forward){player.position.z-=0.1;dir.z-=1;walking=true;}
+            if(move.backward){player.position.z+=0.1;dir.z+=1;walking=true;}
+
+            if(walking){
+                let angle = Math.atan2(dir.x, dir.z);
+                player.rotation.y = angle;
+                walkAngle+=0.2;
+                leftLeg.upper.rotation.x = Math.sin(walkAngle)*0.5;
+                rightLeg.upper.rotation.x = Math.sin(walkAngle+Math.PI)*0.5;
+                leftLeg.lower.rotation.x = Math.sin(walkAngle+Math.PI/2)*0.5;
+                rightLeg.lower.rotation.x = Math.sin(walkAngle+Math.PI*1.5)*0.5;
+            }else{
+                leftLeg.upper.rotation.x = rightLeg.upper.rotation.x = 0;
+                leftLeg.lower.rotation.x = rightLeg.lower.rotation.x = 0;
+            }
+
+            spaghettiPieces.forEach((line,i)=>{
+                let positions = line.geometry.attributes.position.array;
+                for(let j=0;j<positions.length;j+=3){
+                    positions[j+2]+=Math.sin(Date.now()*0.002+j+i+line.userData.offset)*0.002;
+                }
+                line.geometry.attributes.position.needsUpdate=true;
+            });
+
+            for(let i=spaghettiPieces.length-1;i>=0;i--){
+                let line=spaghettiPieces[i];
+                let headPos=new THREE.Vector3();
+                player.children[1].getWorldPosition(headPos);
+                if(headPos.distanceTo(line.position)<1){ // increased collision distance
+                    scene.remove(line);
+                    spaghettiPieces.splice(i,1);
+                    score+=1;
+                    document.getElementById('score').innerText='Score: '+score;
+                    createSpaghetti();
+                    eatSound.currentTime=0;
+                    eatSound.play();
+                }
+            }
+
+            camera.position.x = player.position.x;
+            camera.position.z = player.position.z + 10;
+            camera.position.y = player.position.y + 5;
+            camera.lookAt(player.position);
+
+            renderer.render(scene,camera);
+        }
+        animate();
+
+        window.addEventListener('resize',()=>{
+            camera.aspect=window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth,window.innerHeight);
+        });
+
+        const shopBtn = document.getElementById('shopBtn');
+        const shop = document.getElementById('shop');
+        const backBtn = document.getElementById('backBtn');
+        const newCharacter = document.getElementById('newCharacter');
+
+        shopBtn.addEventListener('click',()=>{shop.style.display='flex';});
+        backBtn.addEventListener('click',()=>{shop.style.display='none';});
+
+        newCharacter.addEventListener('click',()=>{
+            if(score>=10){
+                score-=10;
+                document.getElementById('score').innerText='Score: '+score;
+                player.clear();
+                let body = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.3), new THREE.MeshStandardMaterial({color:0xff00ff}));
+                body.position.y=1;
+                player.add(body);
+                let head = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), new THREE.MeshStandardMaterial({color:0xffff00}));
+                head.position.y=1.8;
+                player.add(head);
+                let eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshStandardMaterial({color:0x0000ff}));
+                eye1.position.set(-0.1,0.05,0.2);
+                let eye2 = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshStandardMaterial({color:0x0000ff}));
+                eye2.position.set(0.1,0.05,0.2);
+                head.add(eye1,eye2);
+                let mouth = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.05,0.02), new THREE.MeshStandardMaterial({color:0xff0000}));
+                mouth.position.set(0,-0.1,0.2);
+                head.add(mouth);
+                createDefaultCharacter();
+                shop.style.display='none';
+            }
+        });
+
+    </script>
+</body>
+</html>
